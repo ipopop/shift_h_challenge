@@ -1,39 +1,41 @@
 import requests
 
-headers = {
-  'Authorization': 'Bearer b1869acc141e5f20c87dcbac8b9a3e9d',
-}
+class ShiftHeroesAPI:
+    def __init__(self, base_url, headers):
+        self.base_url = base_url
+        self.headers = headers
 
-# GET Plannings List
-response = requests.get('https://shiftheroes.fr/api/v1/plannings', headers=headers)
+    def get_plannings(self):
+        url = f"{self.base_url}/api/v1/plannings"
+        response = requests.get(url, headers=self.headers)
+        return response.json()
+    
+    def get_planning_slots(self, planning_id):
+        url = f"{self.base_url}/api/v1/plannings/{planning_id}/shifts"
+        response = requests.get(url, headers=self.headers)
+        return response.json()
 
-plannings_list = response.json()
+    def reserve_slot(self, planning_id, slot_id):
+        url = f"{self.base_url}/api/v1/plannings/{planning_id}/shifts/{slot_id}/reservations"
+        response = requests.post(url, headers=self.headers)
+        return response
 
-# Print Plannings List
-print(f'Plannings List : {plannings_list}')
+if __name__ == "__main__":
+    base_url = "https://shiftheroes.fr"
+    headers = {
+        'Authorization': 'Bearer b1869acc141e5f20c87dcbac8b9a3e9d',
+    }
 
-# GET Plannings List ID
-planning_id = (plannings_list[2]['id'])
+    api = ShiftHeroesAPI(base_url, headers)
+    plannings = api.get_plannings()
+    print(f'Plannings List : {plannings}')
 
-# Print Planning ID
-print(f'Planning ID : {planning_id}')
+    planning_id = plannings[2]['id']
+    print(f'Planning ID : {planning_id}')
 
-# GET Planning Slots
-planning_slots = requests.get('https://shiftheroes.fr/api/v1/plannings/' + planning_id + '/shifts', headers=headers)
+    planning_slots = api.get_planning_slots(planning_id)
+    print(f'Planning Slots : {planning_slots}')
 
-# Print Planning Slots
-print(f'Planning Slots : {planning_slots.json()}')
-
-# Print Planning Slots ID 
-print(f'Planning Slots ID : {planning_slots.json()[2]["id"]}')
-
-slot_id = planning_slots.json()[2]['id']
-
-# POST Planning Slots ID
-response3 = requests.post('https://shiftheroes.fr/api/v1/plannings/' + planning_id + '/shifts/' + slot_id + '/reservations', headers=headers)
-
-# POST /api/v1/plannings/VezfK6/shifts/6JFOGj/reservations
-
-# Print Planning Slots ID Reservation 
-print(f'Planning Slots ID Reservation : {response3}')
-# print(response3.json()[2]['id'])
+    slot_id = planning_slots[2]['id']
+    response = api.reserve_slot(planning_id, slot_id)
+    print(f'Planning Slots ID Reservation : {response}')
