@@ -1,4 +1,13 @@
 import requests
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Access the bearer code from the environment variable
+secret_bearer_code = os.getenv("SECRET_BEARER_CODE")
+
 
 class ShiftHeroesAPI:
     def __init__(self, base_url, headers):
@@ -23,7 +32,7 @@ class ShiftHeroesAPI:
 if __name__ == "__main__":
     base_url = "https://shiftheroes.fr"
     headers = {
-        'Authorization': 'Bearer b1869acc141e5f20c87dcbac8b9a3e9d',
+        'Authorization': f'Bearer {secret_bearer_code}',
     }
 
     api = ShiftHeroesAPI(base_url, headers)
