@@ -3,6 +3,7 @@ import datetime
 import requests
 import os
 from dotenv import load_dotenv
+import schedule
 
 # Load environment variables from .env file
 load_dotenv()
@@ -92,6 +93,46 @@ class ShiftHeroesAPI:
                 available_slots.append(slot_info)
 
         return available_slots
+    
+def print_countdown(count):
+    for i in range(count, 0, -1):
+        print(f'[{datetime.datetime.now()}] Function is starting from {i} seconds...', flush=True)
+        time.sleep(1)
+    
+def check_and_reserve_available_slots():
+    """
+    Checks for available slots and reserves the first one.
+
+    This function repeatedly checks for available slots by calling the `list_available_slots` method of the `api` object. If an available slot is found, it reserves the first one by calling the `reserve_slot` method of the `api` object. The function also prints diagnostic messages indicating the progress of the slot checking and reservation process.
+
+    Parameters:
+        None
+
+    Returns:
+        None
+    """
+    count_no_slots = 0  # Counter for "Available Slots : []"
+
+    while True:
+        available_slots = api.list_available_slots(planning_id)
+        print(f'[{datetime.datetime.now()}] Checking for available slots...')
+        print(f'Available Slots : {available_slots}')
+
+        if available_slots:
+            first_slot_id = available_slots[0]['id']
+            print(f'First Slot ID : {first_slot_id}')
+
+            api.reserve_slot(planning_id, first_slot_id)
+            print("Reservation successful!")
+            
+            schedule.clear('check_and_reserve_available_slots')
+            break
+        else:
+            count_no_slots += 1
+
+        time.sleep(5)
+
+    print(f'No available slots found after {count_no_slots} checks.')
 
 
 if __name__ == "__main__":
@@ -119,3 +160,9 @@ if __name__ == "__main__":
         print("Reservation successful!")
     else:
         print("No available slots found.")
+
+    schedule.every(5).seconds.do(check_and_reserve_available_slots)
+    
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
