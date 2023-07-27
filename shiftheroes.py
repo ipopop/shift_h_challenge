@@ -133,6 +133,35 @@ def check_and_reserve_available_slots():
         time.sleep(5)
 
     print(f'No available slots found after {count_no_slots} checks.')
+    
+    
+def reach_api_call_limit(api, planning_id, max_calls=100):
+    """
+    Reaches the maximum limit of API calls by calling the ShiftHeroesAPI methods repeatedly.
+
+    Parameters:
+        api (ShiftHeroesAPI): The ShiftHeroesAPI instance.
+        planning_id (str): The ID of the planning to check for available slots.
+        max_calls (int): The maximum number of API calls to make. Default is 100.
+
+    Returns:
+        None
+    """
+    for _ in range(max_calls):
+        available_slots = api.list_available_slots(planning_id)
+        print(f'[{datetime.datetime.now()}] API Call - Available Slots : {available_slots}')
+        if available_slots:
+            first_slot_id = available_slots[0]['id']
+            print(f'First Slot ID : {first_slot_id}')
+
+            # Make a quick reservation for the first available slot
+            api.reserve_slot(planning_id, first_slot_id)
+            print("Reservation successful!")
+        else:
+            print("No available slots found.")
+        
+        # Wait a few seconds before making the next API call
+        time.sleep(5)
 
 
 if __name__ == "__main__":
@@ -161,6 +190,8 @@ if __name__ == "__main__":
     else:
         print("No available slots found.")
 
+    reach_api_call_limit(api, planning_id, max_calls=10)
+    
     schedule.every(5).seconds.do(check_and_reserve_available_slots)
     
     while True:
