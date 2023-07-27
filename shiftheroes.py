@@ -1,4 +1,5 @@
 import time
+import datetime
 import requests
 import os
 from dotenv import load_dotenv
@@ -59,8 +60,38 @@ class ShiftHeroesAPI:
             raise Exception(
                 "Failed to reserve slot. Response code: {}".format(response.status_code))
 
-    # TODO : list available slots on a daily or weekly schedule less than 5 seconds after publication
-    # new code here...
+    def list_available_slots(self, planning_id):
+        """
+        List the available slots for a given planning ID.
+
+        Parameters:
+            planning_id (str): The ID of the planning.
+
+        Returns:
+            list: A list of available slots.
+        """
+        planning_slots = self.get_planning_slots(planning_id)
+        available_slots = []
+
+        for slot in planning_slots:
+            start_time_str = slot["start_hour"]
+            end_time_str = slot["end_hour"]
+
+            start_time = datetime.datetime.fromisoformat(start_time_str[:-1])  # Remove 'Z' at the end
+            end_time = datetime.datetime.fromisoformat(end_time_str[:-1])  # Remove 'Z' at the end
+
+            # Check if the slot is available and starts in the future
+            if slot["seats_taken"] < slot["seats"] and start_time > datetime.datetime.now():
+                slot_info = {
+                    "id": slot["id"],
+                    "day": slot["day"],
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "seats_available": slot["seats"] - slot["seats_taken"]
+                }
+                available_slots.append(slot_info)
+
+        return available_slots
 
 
 if __name__ == "__main__":
@@ -75,3 +106,16 @@ if __name__ == "__main__":
 
     planning_id = plannings[2]['id']
     print(f'Planning ID : {planning_id}')
+
+    available_slots = api.list_available_slots(planning_id)
+    print(f'Available Slots : {available_slots}')
+
+    if available_slots:
+        first_slot_id = available_slots[0]['id']
+        print(f'First Slot ID : {first_slot_id}')
+
+        # Make a quick reservation for the first available slot
+        api.reserve_slot(planning_id, first_slot_id)
+        print("Reservation successful!")
+    else:
+        print("No available slots found.")
