@@ -1,3 +1,4 @@
+import time
 import requests
 import os
 from dotenv import load_dotenv
@@ -23,7 +24,7 @@ class ShiftHeroesAPI:
         url = f"{self.base_url}/api/v1/plannings"
         response = requests.get(url, headers=self.headers)
         return response.json()
-    
+
     def get_planning_slots(self, planning_id):
         """
         Get the planning slots for a given planning ID.
@@ -53,6 +54,24 @@ class ShiftHeroesAPI:
         response = requests.post(url, headers=self.headers)
         return response
 
+    def quick_reservation(self, planning_id):
+        """
+        Performs a quick reservation of the first available slot for a given planning.
+
+        Parameters:
+            planning_id (int): The ID of the planning.
+
+        Returns:
+            Response: The response object returned by the API.
+        """
+        slots = self.get_planning_slots(planning_id)
+        if len(slots) > 0:
+            slot_id = slots[0]['id']
+            return self.reserve_slot(planning_id, slot_id)
+        else:
+            raise Exception("No available slots for reservation.")
+
+
 if __name__ == "__main__":
     base_url = "https://shiftheroes.fr"
     headers = {
@@ -66,9 +85,5 @@ if __name__ == "__main__":
     planning_id = plannings[2]['id']
     print(f'Planning ID : {planning_id}')
 
-    planning_slots = api.get_planning_slots(planning_id)
-    print(f'Planning Slots : {planning_slots}')
-
-    slot_id = planning_slots[2]['id']
-    response = api.reserve_slot(planning_id, slot_id)
-    print(f'Planning Slots ID Reservation : {response}')
+    response = api.quick_reservation(planning_id)
+    print(f'Quick Reservation Response : {response}')
