@@ -41,35 +41,26 @@ class ShiftHeroesAPI:
 
     def reserve_slot(self, planning_id, slot_id):
         """
-        Reserves a slot by sending a POST request to the API.
-
-        Args:
-            planning_id (int): The ID of the planning.
-            slot_id (int): The ID of the slot to be reserved.
-
-        Returns:
-            Response: The response object returned by the API.
-        """
-        url = f"{self.base_url}/api/v1/plannings/{planning_id}/shifts/{slot_id}/reservations"
-        response = requests.post(url, headers=self.headers)
-        return response
-
-    def quick_reservation(self, planning_id):
-        """
         Performs a quick reservation of the first available slot for a given planning.
 
         Parameters:
-            planning_id (int): The ID of the planning.
+            planning_id (str): The ID of the planning.
 
         Returns:
             Response: The response object returned by the API.
         """
-        slots = self.get_planning_slots(planning_id)
-        if len(slots) > 0:
-            slot_id = slots[0]['id']
-            return self.reserve_slot(planning_id, slot_id)
+        url = "{}/api/v1/plannings/{}/shifts/{}/reservations".format(
+            self.base_url, planning_id, slot_id)
+        response = requests.post(url, headers=self.headers)
+
+        if response.status_code == 201:
+            return response
         else:
-            raise Exception("No available slots for reservation.")
+            raise Exception(
+                "Failed to reserve slot. Response code: {}".format(response.status_code))
+
+    # TODO : list available slots on a daily or weekly schedule less than 5 seconds after publication
+    # new code here...
 
 
 if __name__ == "__main__":
@@ -84,6 +75,3 @@ if __name__ == "__main__":
 
     planning_id = plannings[2]['id']
     print(f'Planning ID : {planning_id}')
-
-    response = api.quick_reservation(planning_id)
-    print(f'Quick Reservation Response : {response}')
