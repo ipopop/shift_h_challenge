@@ -1,0 +1,11 @@
+{
+  "accounts": [
+    {
+      "api_key": "SECRET_BEARER_CODE_001"
+    },
+    {
+      "api_key": "SECRET_BEARER_CODE_002"
+    }
+  ]
+}
+
