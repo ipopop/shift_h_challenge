@@ -1,15 +1,15 @@
 import time
 import datetime
 import requests
+import threading
 import os
 from dotenv import load_dotenv
-import schedule
 
 # Load environment variables from .env file
 load_dotenv()
 
 # Access the bearer code from the environment variable
-secret_bearer_code = os.getenv("SECRET_BEARER_CODE")
+secret_bearer_code = os.getenv("SECRET_BEARER_CODE_001")
 
 
 class ShiftHeroesAPI:
@@ -39,39 +39,34 @@ class ShiftHeroesAPI:
         """
         url = f"{self.base_url}/api/v1/plannings/{planning_id}/shifts"
         response = requests.get(url, headers=self.headers)
-        return response.json()
+        response_json = response.json()
+        if "error" in response_json:
+            raise Exception(f"Failed to get planning slots. Error: {response_json['error']}")
+        return response_json
 
     def reserve_slot(self, planning_id, slot_id):
         """
-        Performs a quick reservation of the first available slot for a given planning.
+        Performs a reservation of a slot for a given planning.
 
         Parameters:
             planning_id (str): The ID of the planning.
+            slot_id (str): The ID of the slot.
 
         Returns:
             Response: The response object returned by the API.
         """
-        url = "{}/api/v1/plannings/{}/shifts/{}/reservations".format(
-            self.base_url, planning_id, slot_id)
+        url = f"{self.base_url}/api/v1/plannings/{planning_id}/shifts/{slot_id}/reservations"
         response = requests.post(url, headers=self.headers)
 
         if response.status_code == 201:
             return response
         else:
             raise Exception(
-                "Failed to reserve slot. Response code: {}".format(response.status_code))
+                f"Failed to reserve slot. Response code: {response.status_code}")
 
     def list_available_slots(self, planning_id):
-        """
-        List the available slots for a given planning ID.
-
-        Parameters:
-            planning_id (str): The ID of the planning.
-
-        Returns:
-            list: A list of available slots.
-        """
         planning_slots = self.get_planning_slots(planning_id)
+        print(f"Planning Slots: {planning_slots}")
         available_slots = []
 
         for slot in planning_slots:
@@ -93,107 +88,98 @@ class ShiftHeroesAPI:
                 available_slots.append(slot_info)
 
         return available_slots
-    
-def print_countdown(count):
-    for i in range(count, 0, -1):
-        print(f'[{datetime.datetime.now()}] Function is starting from {i} seconds...', flush=True)
-        time.sleep(1)
-    
-def check_and_reserve_available_slots():
-    """
-    Checks for available slots and reserves the first one.
 
-    This function repeatedly checks for available slots by calling the `list_available_slots` method of the `api` object. If an available slot is found, it reserves the first one by calling the `reserve_slot` method of the `api` object. The function also prints diagnostic messages indicating the progress of the slot checking and reservation process.
+
+def check_and_reserve_available_slots(planning_id):
+    """
+    Checks for available slots and reserves them.
+
+    This function repeatedly checks for available slots by calling the `list_available_slots` method. If an available slot is found, it reserves the slot by calling the `reserve_slot` method. The function also prints diagnostic messages indicating the progress of the slot checking and reservation process.
 
     Parameters:
-        None
+        planning_id (str): The ID of the planning.
 
     Returns:
         None
     """
-    count_no_slots = 0  # Counter for "Available Slots : []"
+    count_slots_reserved = 0
+    start_time = None
 
-    while True:
-        available_slots = api.list_available_slots(planning_id)
-        print(f'[{datetime.datetime.now()}] Checking for available slots...')
-        print(f'Available Slots : {available_slots}')
+    while count_slots_reserved < 14:
+        if start_time is None:
+            plannings = api.get_plannings()
+            planning = next((p for p in plannings if p["id"] == planning_id), None)
+            if planning and planning["state"] == "published":
+                start_time = time.time()
+                print(f"[{datetime.datetime.now()}] Planning is published. Starting reservation process...")
+            else:
+                print(f"[{datetime.datetime.now()}] Planning is not published yet. Waiting...")
+                time.sleep(1)
+                continue
 
-        if available_slots:
-            first_slot_id = available_slots[0]['id']
-            print(f'First Slot ID : {first_slot_id}')
-
-            api.reserve_slot(planning_id, first_slot_id)
-            print("Reservation successful!")
-            
-            schedule.clear('check_and_reserve_available_slots')
+        if start_time is not None and (time.time() - start_time) > 10:
+            print(f"[{datetime.datetime.now()}] Reservation process did not start within 10 seconds.")
             break
-        else:
-            count_no_slots += 1
 
-        time.sleep(5)
-
-    print(f'No available slots found after {count_no_slots} checks.')
-    
-    
-def reach_api_call_limit(api, planning_id, max_calls=100):
-    """
-    Reaches the maximum limit of API calls by calling the ShiftHeroesAPI methods repeatedly.
-
-    Parameters:
-        api (ShiftHeroesAPI): The ShiftHeroesAPI instance.
-        planning_id (str): The ID of the planning to check for available slots.
-        max_calls (int): The maximum number of API calls to make. Default is 100.
-
-    Returns:
-        None
-    """
-    for _ in range(max_calls):
         available_slots = api.list_available_slots(planning_id)
-        print(f'[{datetime.datetime.now()}] API Call - Available Slots : {available_slots}')
-        if available_slots:
-            first_slot_id = available_slots[0]['id']
-            print(f'First Slot ID : {first_slot_id}')
+        print(f"[{datetime.datetime.now()}] Checking for available slots...")
+        print(f"Available Slots : {available_slots}")
 
-            # Make a quick reservation for the first available slot
-            api.reserve_slot(planning_id, first_slot_id)
-            print("Reservation successful!")
-        else:
-            print("No available slots found.")
-        
-        # Wait a few seconds before making the next API call
-        time.sleep(5)
+        if available_slots:
+            for slot in available_slots:
+                slot_id = slot["id"]
+                try:
+                    api.reserve_slot(planning_id, slot_id)
+                    count_slots_reserved += 1
+                    print(f"[{datetime.datetime.now()}] Slot {slot_id} reserved successfully.")
+                except Exception as e:
+                    print(f"[{datetime.datetime.now()}] Failed to reserve slot {slot_id}: {str(e)}")
+
+        time.sleep(1)  # Wait for 1 second before checking again
+
+    if count_slots_reserved == 14:
+        print(f"[{datetime.datetime.now()}] Successfully reserved 14 slots.")
+    else:
+        print(f"[{datetime.datetime.now()}] Reservation process stopped.")
+
+
+def check_planning(planning_id):
+    print(f"Checking planning ID: {planning_id}")
+    check_and_reserve_available_slots(planning_id)
 
 
 if __name__ == "__main__":
     base_url = "https://shiftheroes.fr"
     headers = {
-        'Authorization': f'Bearer {secret_bearer_code}',
+        "Authorization": f"Bearer {secret_bearer_code}"
     }
 
     api = ShiftHeroesAPI(base_url, headers)
     plannings = api.get_plannings()
-    print(f'Plannings List : {plannings}')
+    print(f"Plannings List : {plannings}")
 
-    planning_id = plannings[2]['id']
-    print(f'Planning ID : {planning_id}')
+    # Choose the planning type to reserve slots
+    desired_planning_type = "daily"
 
-    available_slots = api.list_available_slots(planning_id)
-    print(f'Available Slots : {available_slots}')
+    found_planning_ids = []  # List to store the planning IDs that match the desired planning type
 
-    if available_slots:
-        first_slot_id = available_slots[0]['id']
-        print(f'First Slot ID : {first_slot_id}')
+    # Iterate over all the plannings
+    for planning in plannings:
+        if planning["planning_type"] == desired_planning_type:
+            planning_id = planning["id"]
+            found_planning_ids.append(planning_id)
+            print(f"Selected planning ID: {planning_id}")
 
-        # Make a quick reservation for the first available slot
-        api.reserve_slot(planning_id, first_slot_id)
-        print("Reservation successful!")
+    if not found_planning_ids:
+        print(f"No planning found with planning type '{desired_planning_type}'")
     else:
-        print("No available slots found.")
+        # Create a separate thread for each planning and start them concurrently
+        threads = []
+        for planning_id in found_planning_ids:
+            thread = threading.Thread(target=check_planning, args=(planning_id,))
+            threads.append(thread)
+            thread.start()
 
-    reach_api_call_limit(api, planning_id, max_calls=10)
-    
-    schedule.every(5).seconds.do(check_and_reserve_available_slots)
-    
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
+        # Wait for all the threads to finish
+        for thread in threads:
+            thread.join()
